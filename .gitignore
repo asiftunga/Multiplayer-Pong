@@ -1,0 +1,39 @@
+# client tarafindaki dosyalar
+.snowpack
+build
+node_modules
+
+# Build ve derleme araçları tarafından oluşturulan dosyalar
+bin/
+obj/
+Debug/
+Release/
+*.suo
+*.user
+*.userosscache
+*.sln
+docstates/
+
+# Üçüncü taraf kütüphaneleri
+packages/
+
+# Test dosyaları
+*.Test.cs
+*.Tests.cs
+*.Spec.cs
+
+# Veritabanı dosyaları (uygunsa)
+App_Data/
+bin/Debug/EntityFramework.dll
+bin/Release/EntityFramework.dll
+
+# IDE ayar dosyaları
+# Visual Studio
+*.csproj.user
+*.vbproj.user
+*.resx
+*.sln.suo
+*.ds_store
+
+# JetBrains Rider
+*.idea/

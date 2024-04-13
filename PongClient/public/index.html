@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong Game</title>
+</head>
+<body>
+    <div id="start-screen">
+        <h1>Aktif Oyuncu Sayisi : <span id="activePlayerCount"></span></h1>
+        <h1>Pong Oyunu</h1>
+        <button id="host">Host Oluştur</button>
+        <button id="join">Oyun Odasına Katıl</button>
+        <input type="text" id="game-code-input" placeholder="Oyun Kodu">
+    </div>
+
+    <canvas id="pong-game" width="800" height="600"></canvas>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/typescript/4.3.2/es6/typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js" integrity="sha512-7rhBJh1om/W5Ztx7WiYOR9h2wlSaTmPyQMoHFtbT/FVNIA12y6S6I8HY9mrBS1uJ3dSU/R3qaSAXsGYuRjMDxg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script type="module" src="dist/index.js"></script>
+</body>
+</html>
