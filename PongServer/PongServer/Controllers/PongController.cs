@@ -40,6 +40,8 @@ public class PongController : ControllerBase
 
         UpdateGameSession(gameSession.HostConnectionId, gameCode, connectionId);
 
+        await _pongHub.Clients.Client(gameSession.HostConnectionId!).SendAsync("StartGame");
+
         return Ok();
     }
 
