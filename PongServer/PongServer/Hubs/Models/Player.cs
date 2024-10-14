@@ -6,5 +6,5 @@ public class Player
 
     public bool IsHost { get; set; }
 
-    public string? GameCode { get; set; }
+    public string GameCode { get; set; }
 }

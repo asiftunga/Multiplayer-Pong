@@ -4,7 +4,11 @@ public interface IPongHub
 {
     Task ClientCount(int count);
 
-    Task PlayerJoined();
+    Task PlayerJoined(string connectionId);
+
+    Task JoinedGame(string hostConnectionId);
+
+    Task  ReceiveOpponentPaddlePosition(double paddle);
 
     Task GameEnded();
 

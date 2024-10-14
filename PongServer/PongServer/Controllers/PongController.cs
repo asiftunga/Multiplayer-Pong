@@ -1,95 +1,105 @@
 ﻿using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Caching.Memory;
+using PongServer.Constants;
 using PongServer.Controllers.Models;
+using PongServer.Controllers.Models.Requests;
 using PongServer.Hubs;
 
 namespace PongServer.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/[controller]/[action]")]
 [ApiController]
 public class PongController : ControllerBase
 {
-    private readonly IHubContext<PongHub> _pongHub;
-    private readonly string _gameSessionsFilePath = Path.Combine(AppContext.BaseDirectory, "GameSessions.json");
+    private readonly IHubContext<PongHub, IPongHub> _pongHub;
+    private readonly IMemoryCache _memoryCache;
 
-    public PongController(IHubContext<PongHub> pongHub)
+    public PongController(IHubContext<PongHub, IPongHub> pongHub, IMemoryCache memoryCache)
     {
         _pongHub = pongHub;
+        _memoryCache = memoryCache;
     }
 
     [HttpPost]
-    public async Task<IActionResult> HostGame(string connectionId)
+    public async Task<IActionResult> HostGame([FromBody] HostGameRequest request)
     {
-        string gameCode = Guid.NewGuid().ToString();
+        string gameCode = Guid.NewGuid().ToString().Split("-")[0];
 
-        UpdateGameSession(connectionId, gameCode, null);
+        UpdateGameSession(request.ConnectionId, gameCode, null);
 
         return Ok(gameCode);
     }
 
     [HttpPost]
-    public async Task<IActionResult> JoinGame(string connectionId, string gameCode)
+    public async Task<IActionResult> JoinGame([FromBody] JoinGameRequest request)
     {
-        GameSession? gameSession = GetGameSession(gameCode);
+            GameSession gameSession = GetGameSession(request.GameCode);
 
         if (gameSession is null)
         {
             return NotFound("Oyun bulunamadi.");
         }
 
-        UpdateGameSession(gameSession.HostConnectionId, gameCode, connectionId);
+        if (gameSession.ClientConnectionId != null)
+        {
+            return BadRequest("Oyun dolu.");
+        }
 
-        await _pongHub.Clients.Client(gameSession.HostConnectionId!).SendAsync("StartGame");
+        UpdateGameSession(gameSession.HostConnectionId, request.GameCode, request.ConnectionId);
+
+        await _pongHub.Clients.Client(gameSession.HostConnectionId).PlayerJoined(request.ConnectionId);
+        await _pongHub.Clients.Client(request.ConnectionId).JoinedGame(gameSession.HostConnectionId);
 
         return Ok();
     }
 
-    [HttpPost]
-    public async Task<IActionResult> LeaveGame(string connectionId)
+    [HttpDelete]
+    public async Task<IActionResult> LeaveGame([FromBody] string connectionId)
     {
-        (GameSession? gameSession, bool host) tuple = GetGameSessionByConnectionId(connectionId);
+        (GameSession gameSession, bool host) game = GetGameSessionByConnectionId(connectionId);
 
-        if (tuple.gameSession is null)
+        if (game.gameSession is null)
         {
             return NoContent();
         }
 
-        if (tuple.host)
+        if (game.host)
         {
-            DeleteGameSession(tuple.gameSession.GameCode!);
+            DeleteGameSession(game.gameSession.GameCode!);
         }
         else
         {
-            UpdateGameSession(tuple.gameSession.HostConnectionId!, tuple.gameSession.GameCode!, null);
+            UpdateGameSession(game.gameSession.HostConnectionId!, game.gameSession.GameCode!, null);
         }
 
-        return Ok();
+        return NoContent();
     }
 
-    private GameSession? GetGameSession(string gameCode)
+    private GameSession GetGameSession(string gameCode)
     {
         List<GameSession> gameSessions = LoadGameSessions();
 
         return gameSessions.FirstOrDefault(s => s.GameCode == gameCode);
     }
 
-    private (GameSession? gameSession, bool host) GetGameSessionByConnectionId(string connectionId)
+    private (GameSession gameSession, bool host) GetGameSessionByConnectionId(string connectionId)
     {
         List<GameSession> gameSessions = LoadGameSessions();
 
-        GameSession? gameSession = gameSessions.FirstOrDefault(s => s.HostConnectionId == connectionId || s.ClientConnectionId == connectionId);
+        GameSession gameSession = gameSessions.FirstOrDefault(s => s.HostConnectionId == connectionId || s.ClientConnectionId == connectionId);
 
         bool host = gameSession!.HostConnectionId == connectionId;
 
         return (gameSession, host);
     }
 
-    private void UpdateGameSession(string? hostConnectionId, string? gameCode, string? clientConnectionId)
+    private void UpdateGameSession(string hostConnectionId, string gameCode, string clientConnectionId)
     {
         List<GameSession> gameSessions = LoadGameSessions();
 
-        GameSession? existingSession = gameSessions.FirstOrDefault(s => s.GameCode == gameCode);
+        GameSession existingSession = gameSessions.FirstOrDefault(s => s.GameCode == gameCode);
 
         if (existingSession is not null)
         {
@@ -111,7 +121,7 @@ public class PongController : ControllerBase
     {
         List<GameSession> gameSessions = LoadGameSessions();
 
-        GameSession? existingSession = gameSessions.ToList().FirstOrDefault(s => s.GameCode == gameCode);
+        GameSession existingSession = gameSessions.ToList().FirstOrDefault(s => s.GameCode == gameCode);
 
         if (existingSession is not null)
         {
@@ -129,21 +139,11 @@ public class PongController : ControllerBase
 
     private List<GameSession> LoadGameSessions()
     {
-        if (!System.IO.File.Exists(_gameSessionsFilePath))
-        {
-            return new List<GameSession>();
-        }
-
-        string json = System.IO.File.ReadAllText(_gameSessionsFilePath);
-
-        return JsonSerializer.Deserialize<List<GameSession>>(json) ?? new List<GameSession>();
+        return !_memoryCache.TryGetValue(CacheKeys.GameSessions, out List<GameSession> gameSessions) ? [] : gameSessions;
     }
-
 
     private void SaveGameSessions(List<GameSession> gameSessions)
     {
-        string json = JsonSerializer.Serialize(gameSessions);
-
-        System.IO.File.WriteAllText(_gameSessionsFilePath, json);
+        _memoryCache.Set(CacheKeys.GameSessions, gameSessions);
     }
 }
